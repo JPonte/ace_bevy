@@ -1,0 +1,9 @@
+[package]
+name = "ace_bevy"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bevy = { version = "0.5.0", features = ["dynamic"] }
+rand = "0.8.4"
+noise = "0.7"
