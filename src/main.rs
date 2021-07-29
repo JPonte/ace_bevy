@@ -33,6 +33,7 @@ fn main() {
         .add_system(fire_missle.system().label("fire_missile"))
         .add_system(missle_run.system().after("fire_missile"))
         .add_system(radar.system())
+        .add_system(drone_movement.system())
         .run();
 }
 
@@ -77,7 +78,11 @@ fn setup(
                     range: 20000.,
                     ..Default::default()
                 },
-                transform: Transform::from_translation(Vec3::new(x as f32 * 500., 350.0, y as f32 * 500.)),
+                transform: Transform::from_translation(Vec3::new(
+                    x as f32 * 500.,
+                    350.0,
+                    y as f32 * 500.,
+                )),
                 ..Default::default()
             });
         }
@@ -106,16 +111,15 @@ fn setup(
     });
 
     commands
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Box::new(5., 5., 5.))),
-            transform: Transform::from_translation(Vec3::new(100., 50., 10.)),
-            material: materials.add(StandardMaterial {
-                base_color: Color::PURPLE,
-                ..Default::default()
-            }),
-            ..Default::default()
+        .spawn_bundle((
+            Transform::from_translation(Vec3::new(0.0, 300.0, 0.0)),
+            GlobalTransform::identity(),
+        ))
+        .with_children(|parent| {
+            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
         })
-        .insert(Target);
+        .insert(Target)
+        .insert(Drone);
 
     let target_ui_size = 30.;
 
@@ -499,7 +503,7 @@ fn target_ui(
 }
 
 struct Missile {
-    target: Vec3,
+    target: Option<Entity>,
     velocity: f32,
 }
 
@@ -509,6 +513,7 @@ fn fire_missle(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut gamepad_event: EventReader<GamepadEvent>,
     mut player_query: Query<(&Transform, &mut Player)>,
+    target_query: Query<Entity, With<Target>>,
 ) {
     if let Some((player_transform, mut player)) = player_query.iter_mut().next() {
         for event in gamepad_event.iter() {
@@ -546,7 +551,7 @@ fn fire_missle(
                                 ..Default::default()
                             })
                             .insert(Missile {
-                                target: Vec3::new(100., 50., 10.),
+                                target: target_query.iter().next(),
                                 velocity: player.velocity + 30.,
                             });
                         player.missiles_fired = player.missiles_fired + 1;
@@ -560,13 +565,28 @@ fn fire_missle(
 
 fn missle_run(
     mut commands: Commands,
-    mut missile_query: Query<(&mut Transform, &Missile, Entity)>,
+
+    missile_query: Query<(&Missile, Entity)>,
+
+    mut transforms_query: QuerySet<(
+        Query<&mut Transform, With<Missile>>,
+        Query<&Transform, With<Target>>,
+    )>,
     time: Res<Time>,
 ) {
-    for (mut missile_transform, missile, entity) in missile_query.iter_mut() {
-        let target_dir = (missile.target - missile_transform.translation).normalize_or_zero();
+    for (missile, missile_entity) in missile_query.iter() {
+        let target_translation = missile.target.map(|target| {
+            let target_transform = transforms_query.q1().get(target).unwrap();
+            target_transform.translation
+        });
 
+        let mut missile_transform = transforms_query.q0_mut().get_mut(missile_entity).unwrap();
         let current_dir = (missile_transform.rotation * Vec3::Y).normalize_or_zero();
+
+        let target_dir = match target_translation {
+            Some(dir) => (dir - missile_transform.translation).normalize_or_zero(),
+            None => current_dir,
+        };
 
         let velocity = if current_dir.angle_between(target_dir).abs() < std::f32::consts::FRAC_PI_2
         {
@@ -582,8 +602,10 @@ fn missle_run(
             missile_transform.translation + velocity * time.delta_seconds();
         missile_transform.rotation = Quat::from_rotation_arc(Vec3::Y, velocity.normalize_or_zero());
 
-        if (missile.target - missile_transform.translation).length() < 2. {
-            commands.entity(entity).despawn_recursive();
+
+        let distance_to_target = target_translation.map(|t| { (t - missile_transform.translation).length()}).unwrap_or(0.);
+        if distance_to_target < 2. {
+            commands.entity(missile_entity).despawn_recursive();
         }
     }
 }
@@ -634,5 +656,24 @@ fn radar(
                 }
             }
         }
+    }
+}
+
+struct Drone;
+
+fn drone_movement(mut drone_query: Query<(&mut Transform, &Drone)>, timer: Res<Time>) {
+    if let Some((mut drone_transform, _)) = drone_query.iter_mut().next() {
+        let pitch_delta = 0. * timer.delta_seconds() * PITCH_SPEED;
+        let roll_delta = 0. * timer.delta_seconds() * ROLL_SPEED;
+        let yaw_delta = 0.5 * timer.delta_seconds() * YAW_SPEED;
+
+        let ypr_rotation = Quat::from_rotation_ypr(yaw_delta, pitch_delta, roll_delta);
+
+        let velocity = 90.;
+
+        drone_transform.rotation = drone_transform.rotation * ypr_rotation;
+
+        drone_transform.translation = drone_transform.translation
+            + (drone_transform.rotation * Vec3::X * velocity * timer.delta_seconds());
     }
 }
