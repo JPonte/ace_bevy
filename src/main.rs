@@ -6,7 +6,6 @@ use bevy::{
     render::mesh::Mesh,
     utils::HashSet,
 };
-use rand;
 
 mod terrain;
 use terrain::setup_terrain;
@@ -69,19 +68,19 @@ fn setup(
         brightness: 0.01,
     });
 
-    for i in 0..10 {
-        let x = rand::random::<f32>() * 2000. - 1000.;
-        let y = rand::random::<f32>() * 2000. - 1000.;
-        commands.spawn_bundle(LightBundle {
-            light: Light {
-                color: Color::WHITE,
-                intensity: 20000.,
-                range: 20000.,
+    for x in -1..2 {
+        for y in -1..2 {
+            commands.spawn_bundle(LightBundle {
+                light: Light {
+                    color: Color::WHITE,
+                    intensity: 20000.,
+                    range: 20000.,
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(x as f32 * 500., 350.0, y as f32 * 500.)),
                 ..Default::default()
-            },
-            transform: Transform::from_translation(Vec3::new(x, 200.0, y)),
-            ..Default::default()
-        });
+            });
+        }
     }
 
     commands
@@ -96,6 +95,7 @@ fn setup(
 
     commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Plane { size: 2000. })),
+        transform: Transform::from_translation(Vec3::new(0., 10., 0.)),
         material: materials.add(StandardMaterial {
             base_color: Color::MIDNIGHT_BLUE,
             roughness: 0.7,
@@ -185,7 +185,7 @@ fn setup(
 
     commands
         .spawn_bundle((
-            Transform::from_translation(Vec3::new(0.0, 10.0, 0.0)),
+            Transform::from_translation(Vec3::new(0.0, 800.0, 0.0)),
             GlobalTransform::identity(),
         ))
         .with_children(|parent| {
@@ -352,8 +352,8 @@ const ROLL_SPEED: f32 = 1.;
 const PITCH_SPEED: f32 = 2.;
 const YAW_SPEED: f32 = 0.5;
 
-const MIN_SPEED: f32 = 10.;
-const MAX_SPEED: f32 = 50.;
+const MIN_SPEED: f32 = 20.;
+const MAX_SPEED: f32 = 100.;
 const ACCEL: f32 = 4.;
 const BRAKE: f32 = 8.;
 
@@ -388,7 +388,7 @@ fn text_update_system(
         for mut text in query.iter_mut() {
             text.sections[0].value = format!(
                 "{:.2} Km/H\n{} m",
-                (player.velocity * 50.).round() as i32,
+                (player.velocity * 25.).round() as i32,
                 (player_transform.translation.y * 5.) as i32
             );
         }
