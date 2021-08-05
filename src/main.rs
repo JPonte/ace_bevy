@@ -1,4 +1,5 @@
 use bevy::{
+    core::FixedTimestep,
     input::gamepad::{Gamepad, GamepadButton, GamepadEvent, GamepadEventType},
     pbr::AmbientLight,
     prelude::*,
@@ -9,6 +10,9 @@ use bevy::{
 
 mod terrain;
 use terrain::setup_terrain;
+
+mod particles;
+use particles::*;
 
 fn main() {
     App::build()
@@ -21,6 +25,9 @@ fn main() {
         .insert_resource(PlayerInput::default())
         .init_resource::<GamepadLobby>()
         .add_plugins(DefaultPlugins)
+        .add_asset::<ParticleMaterial>()
+        .insert_resource(SmokeTextures::default())
+        .add_startup_system(setup_particles.system())
         .add_startup_system(setup.system())
         .add_startup_system(setup_terrain.system())
         .add_system(player_input.system())
@@ -34,6 +41,11 @@ fn main() {
         .add_system(missle_run.system().after("fire_missile"))
         .add_system(radar.system())
         .add_system(drone_movement.system())
+        .add_system(
+            run_emitter
+                .system().with_run_criteria(FixedTimestep::step(0.05))
+        )
+        .add_system(run_particles.system())
         .run();
 }
 
@@ -308,7 +320,7 @@ fn camera_follow_player(
 
         camera_transform.translation = camera_transform.translation.lerp(
             new_transform.translation,
-            (4. * time.delta_seconds()).clamp(0., 1.),
+            (8. * time.delta_seconds()).clamp(0., 1.),
         );
         camera_transform.rotation = camera_transform.rotation.lerp(
             new_transform.rotation,
@@ -505,6 +517,7 @@ fn target_ui(
 struct Missile {
     target: Option<Entity>,
     velocity: f32,
+    lifetime: f32
 }
 
 fn fire_missle(
@@ -526,12 +539,12 @@ fn fire_missle(
                         commands
                             .spawn_bundle(PbrBundle {
                                 mesh: meshes.add(Mesh::from(shape::Capsule {
-                                    radius: 0.1,
-                                    depth: 1.,
+                                    radius: 0.05,
+                                    depth: 1.5,
                                     ..Default::default()
                                 })),
                                 material: materials.add(StandardMaterial {
-                                    base_color: Color::GOLD,
+                                    base_color: Color::GRAY,
                                     ..Default::default()
                                 }),
                                 transform: Transform {
@@ -553,6 +566,14 @@ fn fire_missle(
                             .insert(Missile {
                                 target: target_query.iter().next(),
                                 velocity: player.velocity + 30.,
+                                lifetime: 5.
+                            })
+                            .insert(Emitter {
+                                direction: Vec3::X,
+                                spread: 0.001,
+                                speed: 0.5,
+                                lifetime: 3.,
+                                last_emitted: None,
                             });
                         player.missiles_fired = player.missiles_fired + 1;
                     }
@@ -566,7 +587,7 @@ fn fire_missle(
 fn missle_run(
     mut commands: Commands,
 
-    missile_query: Query<(&Missile, Entity)>,
+    mut missile_query: Query<(&mut Missile, Entity)>,
 
     mut transforms_query: QuerySet<(
         Query<&mut Transform, With<Missile>>,
@@ -574,7 +595,7 @@ fn missle_run(
     )>,
     time: Res<Time>,
 ) {
-    for (missile, missile_entity) in missile_query.iter() {
+    for (mut missile, missile_entity) in missile_query.iter_mut() {
         let target_translation = missile.target.map(|target| {
             let target_transform = transforms_query.q1().get(target).unwrap();
             target_transform.translation
@@ -598,13 +619,17 @@ fn missle_run(
             current_dir * missile.velocity
         };
 
+        missile.velocity = (missile.velocity + time.delta_seconds() * 50.).clamp(0., 400.);
+
         missile_transform.translation =
             missile_transform.translation + velocity * time.delta_seconds();
         missile_transform.rotation = Quat::from_rotation_arc(Vec3::Y, velocity.normalize_or_zero());
 
-
-        let distance_to_target = target_translation.map(|t| { (t - missile_transform.translation).length()}).unwrap_or(0.);
-        if distance_to_target < 2. {
+        let distance_to_target = target_translation
+            .map(|t| (t - missile_transform.translation).length())
+            .unwrap_or(0.);
+        missile.lifetime -= time.delta_seconds();
+        if distance_to_target < 2. || missile.lifetime < 0.{
             commands.entity(missile_entity).despawn_recursive();
         }
     }
