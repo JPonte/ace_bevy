@@ -57,10 +57,13 @@ fn mesh_from_heightmap(
         let mut vertices_vec = Vec::new();
         for h in 0..mesh_options.length {
             for w in 0..mesh_options.width {
-                let (height, normal) =
-                    sample_heightmap(w * step_w + offset, h * step_h + offset, heightmap);
+                let (x, y) = (w * step_w + offset, h * step_h + offset);
+                let (height, normal) = sample_heightmap(x, y, heightmap);
                 let vertex = [w as f32, mesh_options.height as f32 * height, h as f32];
-                let uv = [1., 1.];
+                let uv = [
+                    x as f32 / heightmap.width() as f32,
+                    y as f32 / heightmap.height() as f32,
+                ];
                 vertices_vec.push((vertex, normal, uv));
             }
         }
@@ -134,6 +137,18 @@ pub fn setup_terrain(
             base_color: Color::rgb(0.93, 0.79, 0.69),
             metallic: 0.0,
             roughness: 1.0,
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Plane { size: 2000. })),
+        transform: Transform::from_translation(Vec3::new(0., 10., 0.)),
+        material: materials.add(StandardMaterial {
+            base_color: Color::MIDNIGHT_BLUE,
+            roughness: 0.7,
+            metallic: 0.3,
             ..Default::default()
         }),
         ..Default::default()

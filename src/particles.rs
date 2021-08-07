@@ -31,8 +31,6 @@ pub struct Particle {
 
 #[derive(Default)]
 pub struct SmokeTextures {
-    pub text1: Handle<Texture>,
-    pub text2: Handle<Texture>,
     pub pipeline: Handle<PipelineDescriptor>,
 }
 
@@ -44,18 +42,11 @@ pub struct ParticleMaterial {
 }
 
 pub fn setup_particles(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
     mut smoke_textures_res: ResMut<SmokeTextures>,
-
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut shaders: ResMut<Assets<Shader>>,
     mut render_graph: ResMut<RenderGraph>,
 ) {
-    smoke_textures_res.text1 = asset_server.load("puff.png");
-    smoke_textures_res.text2 = asset_server.load("puff2.png");
 
     smoke_textures_res.pipeline = pipelines.add(PipelineDescriptor {
         name: None,
@@ -122,38 +113,6 @@ pub fn setup_particles(
     render_graph
         .add_node_edge("particle_material", base::node::MAIN_PASS)
         .unwrap();
-
-    // commands
-    //     .spawn_bundle(PbrBundle {
-    //         transform: Transform::from_translation(Vec3::new(0., 0., 5.)),
-    //         mesh: meshes.add(Mesh::from(shape::Icosphere {
-    //             radius: 0.1,
-    //             ..Default::default()
-    //         })),
-    //         material: standard_materials.add(StandardMaterial {
-    //             base_color: Color::WHITE,
-    //             metallic: 0.0,
-    //             roughness: 1.0,
-    //             ..Default::default()
-    //         }),
-    //         ..Default::default()
-    //     })
-    //     .insert(Emitter {
-    //         direction: Vec3::Y,
-    //         spread: 0.001,
-    //         speed: 0.5,
-    //         lifetime: 2.,
-    //         last_emitted: None,
-    //     });
-}
-
-pub fn move_emitter(mut query: Query<&mut Transform, With<Emitter>>, time: Res<Time>) {
-    for mut emitter in query.iter_mut() {
-        let dir = emitter.rotation * Vec3::X;
-        emitter.translation += dir.normalize_or_zero() * 20. * time.delta_seconds();
-        emitter.rotation *=
-            Quat::from_rotation_ypr(rand::random::<f32>() * 10. * time.delta_seconds(), 0., 0.)
-    }
 }
 
 pub fn run_particles(
@@ -176,8 +135,6 @@ pub fn run_particles(
     }
 
     if let Some(camera_transform) = camera_transform {
-        // let mut pre_mat = Mat4::default();
-
         for (mut particle_transform, mut particle, particle_entity) in
             query_set.q1_mut().iter_mut()
         {
@@ -279,7 +236,7 @@ pub fn run_emitter(
                 previous_particle: emitter.last_emitted,
             })
             .insert(materials.add(ParticleMaterial {
-                previous_pos: transform.compute_matrix(), // texture: smoke_textures_res.text1.clone(),
+                previous_pos: transform.compute_matrix(),
                 alpha: 1.
             }))
             .id();

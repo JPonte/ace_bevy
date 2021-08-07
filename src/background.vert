@@ -25,6 +25,5 @@ void main() {
     } else {
         v_Position = ViewProj * Model * vec4(Vertex_Position, 1.0);
     }
-    // v_Position = ViewProj * Model * vec4(Vertex_Position, 1.0);
     gl_Position = v_Position;
 }
