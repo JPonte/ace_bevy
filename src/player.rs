@@ -15,6 +15,7 @@ pub const BRAKE: f32 = 8.;
 pub struct Player {
     pub velocity: f32,
     pub missiles_fired: u32,
+    pub target: Option<Entity>,
 }
 pub struct MainCamera;
 pub struct Missile {
@@ -24,10 +25,7 @@ pub struct Missile {
 }
 pub struct Target;
 
-pub fn setup_player(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn_bundle(PerspectiveCameraBundle {
             perspective_projection: PerspectiveProjection {
@@ -154,7 +152,6 @@ pub fn fire_missle(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut gamepad_event: EventReader<GamepadEvent>,
     mut player_query: Query<(&Transform, &mut Player)>,
-    target_query: Query<Entity, With<Target>>,
 ) {
     if let Some((player_transform, mut player)) = player_query.iter_mut().next() {
         for event in gamepad_event.iter() {
@@ -192,7 +189,7 @@ pub fn fire_missle(
                                 ..Default::default()
                             })
                             .insert(Missile {
-                                target: target_query.iter().next(),
+                                target: player.target,
                                 velocity: player.velocity,
                                 lifetime: 5.,
                             })
@@ -214,9 +211,7 @@ pub fn fire_missle(
 
 pub fn missle_run(
     mut commands: Commands,
-
     mut missile_query: Query<(&mut Missile, Entity)>,
-
     mut transforms_query: QuerySet<(
         Query<&mut Transform, With<Missile>>,
         Query<&Transform, With<Target>>,
@@ -255,7 +250,7 @@ pub fn missle_run(
 
         let distance_to_target = target_translation
             .map(|t| (t - missile_transform.translation).length())
-            .unwrap_or(0.);
+            .unwrap_or(f32::INFINITY);
         missile.lifetime -= time.delta_seconds();
         if distance_to_target < 2. || missile.lifetime < 0. {
             commands.entity(missile_entity).despawn_recursive();

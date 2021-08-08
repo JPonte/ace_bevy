@@ -25,6 +25,7 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0.3, 0.56, 0.83)))
         .insert_resource(PlayerInput::default())
         .init_resource::<GamepadLobby>()
+        .init_resource::<UiTargets>()
         .add_plugins(DefaultPlugins)
         .add_asset::<ParticleMaterial>()
         .insert_resource(SmokeTextures::default())
@@ -82,7 +83,29 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands
         .spawn_bundle((
-            Transform::from_translation(Vec3::new(0.0, 300.0, 0.0)),
+            Transform::from_translation(Vec3::new(50.0, 300.0, 0.0)),
+            GlobalTransform::identity(),
+        ))
+        .with_children(|parent| {
+            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
+        })
+        .insert(Target)
+        .insert(Drone);
+
+    commands
+        .spawn_bundle((
+            Transform::from_translation(Vec3::new(0.0, 350.0, -50.0)),
+            GlobalTransform::identity(),
+        ))
+        .with_children(|parent| {
+            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
+        })
+        .insert(Target)
+        .insert(Drone);
+
+    commands
+        .spawn_bundle((
+            Transform::from_translation(Vec3::new(0.0, 325.0, 0.0)),
             GlobalTransform::identity(),
         ))
         .with_children(|parent| {
@@ -93,7 +116,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn drone_movement(mut drone_query: Query<(&mut Transform, &Drone)>, timer: Res<Time>) {
-    if let Some((mut drone_transform, _)) = drone_query.iter_mut().next() {
+    for (mut drone_transform, _) in drone_query.iter_mut() {
         let pitch_delta = 0. * timer.delta_seconds() * PITCH_SPEED;
         let roll_delta = 0. * timer.delta_seconds() * ROLL_SPEED;
         let yaw_delta = 0.5 * timer.delta_seconds() * YAW_SPEED;
