@@ -5,11 +5,11 @@ use super::particles::*;
 
 pub const ROLL_SPEED: f32 = 0.9;
 pub const PITCH_SPEED: f32 = 1.8;
-pub const YAW_SPEED: f32 = 0.5;
+pub const YAW_SPEED: f32 = 0.25;
 pub const MIN_SPEED: f32 = 20.;
 pub const MAX_SPEED: f32 = 100.;
-pub const ACCEL: f32 = 4.;
-pub const BRAKE: f32 = 8.;
+pub const ACCEL: f32 = 20.;
+pub const BRAKE: f32 = 30.;
 
 #[derive(Default)]
 pub struct Player {
@@ -30,6 +30,7 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn_bundle(PerspectiveCameraBundle {
             perspective_projection: PerspectiveProjection {
                 far: 2000.,
+                fov: std::f32::consts::PI / 3.,
                 ..Default::default()
             },
             ..Default::default()
@@ -56,21 +57,26 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 pub fn camera_follow_player(
     mut query_set: QuerySet<(
         Query<&mut Transform, With<MainCamera>>,
-        Query<&Transform, With<Player>>,
+        Query<(&Transform, &Player)>,
+        Query<(&mut PerspectiveProjection, &mut Camera), With<MainCamera>>,
     )>,
+    windows: Res<Windows>,
     time: Res<Time>,
 ) {
     let mut player_translation = Vec3::ZERO;
     let mut player_rotation = Quat::default();
+    let mut player_speed = MIN_SPEED;
 
-    if let Some(player_transform) = query_set.q1().iter().next() {
+    if let Some((player_transform, player)) = query_set.q1().iter().next() {
         player_translation = player_transform.translation;
         player_rotation = player_transform.rotation;
+        player_speed = player.velocity;
     }
+    let speed_ratio = (player_speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
 
     if let Some(mut camera_transform) = query_set.q0_mut().iter_mut().next() {
         let new_transform = Transform::from_translation(
-            player_translation + player_rotation * Vec3::new(-8.0, 2.0, 0.0),
+            player_translation + player_rotation * Vec3::new(-6.0, 2.0, 0.0),
         )
         .looking_at(
             player_translation + (player_rotation * Vec3::Y).normalize() * 1.5,
@@ -79,12 +85,23 @@ pub fn camera_follow_player(
 
         camera_transform.translation = camera_transform.translation.lerp(
             new_transform.translation,
-            (8. * time.delta_seconds()).clamp(0., 1.),
+            ((8. + (speed_ratio * 16.)) * time.delta_seconds()).clamp(0., 1.),
         );
         camera_transform.rotation = camera_transform.rotation.lerp(
             new_transform.rotation,
             (5. * time.delta_seconds()).clamp(0., 1.),
         );
+    }
+
+    if let Some(window) = windows.get_primary() {
+        let (mut perspective_projection, mut camera) = query_set.q2_mut().single_mut().unwrap();
+
+        perspective_projection.fov =
+            std::f32::consts::PI / 3.0 + (speed_ratio * std::f32::consts::PI / 8.);
+
+        perspective_projection.update(window.width(), window.height());
+        camera.projection_matrix = perspective_projection.get_projection_matrix();
+        camera.depth_calculation = perspective_projection.depth_calculation();
     }
 }
 
