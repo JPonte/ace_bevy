@@ -69,7 +69,7 @@ fn setup(
     commands
         .spawn_bundle(MeshBundle {
             transform: Transform::from_translation(Vec3::new(0., 0.0, 0.0)),
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 2000. })),
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 2200. })),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 pipeline_handle,
             )]),

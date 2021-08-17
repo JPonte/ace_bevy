@@ -7,7 +7,7 @@ use super::sky::*;
 pub const ROLL_SPEED: f32 = 0.9;
 pub const PITCH_SPEED: f32 = 1.8;
 pub const YAW_SPEED: f32 = 0.25;
-pub const MIN_SPEED: f32 = 20.;
+pub const MIN_SPEED: f32 = 0.;
 pub const MAX_SPEED: f32 = 100.;
 pub const ACCEL: f32 = 20.;
 pub const BRAKE: f32 = 30.;
@@ -40,12 +40,11 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(SkyBoxCamera);
 
     let plane: Handle<Scene> = asset_server.load("f35.gltf#Scene0");
+    let mut start_transform = Transform::from_translation(Vec3::new(-700., 50., -210.));
+    start_transform.look_at(Vec3::new(-600., 50., -700.), Vec3::Y);
 
     commands
-        .spawn_bundle((
-            Transform::from_translation(Vec3::new(0.0, 400.0, 0.0)),
-            GlobalTransform::identity(),
-        ))
+        .spawn_bundle((start_transform, GlobalTransform::identity()))
         .with_children(|parent| {
             parent.spawn_scene(plane);
         })
