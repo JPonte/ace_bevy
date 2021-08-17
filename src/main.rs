@@ -5,12 +5,14 @@ mod particles;
 mod player;
 mod terrain;
 mod ui;
+mod sky;
 
 use input::*;
 use particles::*;
 use player::*;
 use terrain::*;
 use ui::*;
+use sky::*;
 
 const PLAYER_MOVEMENT_LABEL: &str = "player_movement";
 const FIRE_MISSILE_LABEL: &str = "fire_missile";
@@ -27,6 +29,7 @@ fn main() {
         .init_resource::<GamepadLobby>()
         .init_resource::<UiTargets>()
         .add_plugins(DefaultPlugins)
+        .add_plugin(SkyBoxPlugin)
         .add_asset::<ParticleMaterial>()
         .insert_resource(SmokeTextures::default())
         .add_startup_system(setup_particles.system())

@@ -2,6 +2,7 @@ use bevy::{prelude::*, render::camera::*};
 
 use super::input::*;
 use super::particles::*;
+user super::sky::*;
 
 pub const ROLL_SPEED: f32 = 0.9;
 pub const PITCH_SPEED: f32 = 1.8;
@@ -35,7 +36,8 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             },
             ..Default::default()
         })
-        .insert(MainCamera);
+        .insert(MainCamera)
+        .insert(SkyBoxCamera);
 
     let plane: Handle<Scene> = asset_server.load("f35.gltf#Scene0");
 
