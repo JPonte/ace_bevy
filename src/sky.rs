@@ -23,7 +23,7 @@ impl Plugin for SkyBoxPlugin {
 pub struct SkyBoxCamera;
 
 #[derive(RenderResources, Default, TypeUuid)]
-#[uuid = "1e08866c-0b8a-437e-8bce-37733b25127e"]
+#[uuid = "4bcf7ab2-cd23-4842-9698-a0e7c16093ea"]
 struct SkyMaterial {
     pub color_top: Color,
     pub color_bottom: Color,
@@ -63,13 +63,13 @@ fn setup(
 
     let material = materials.add(SkyMaterial {
         color_top: Color::rgb(0.3, 0.56, 0.83),
-        color_bottom: Color::rgb(0.1, 0.1, 0.2),
+        color_bottom: Color::rgb(0.7, 0.7, 1.0),
     });
 
     commands
         .spawn_bundle(MeshBundle {
             transform: Transform::from_translation(Vec3::new(0., 0.0, 0.0)),
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1000. })),
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 2000. })),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 pipeline_handle,
             )]),

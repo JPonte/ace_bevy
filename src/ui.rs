@@ -154,6 +154,82 @@ fn spawn_target(
         .id()
 }
 
+fn spawn_player_target(
+    commands: &mut Commands,
+    color_materials: &mut ResMut<Assets<ColorMaterial>>,
+) -> Entity {
+    let target_ui_size = 30.;
+
+    commands
+        .spawn_bundle(NodeBundle{
+            ..Default::default()
+        })
+        .with_children(|parent| {
+            parent.spawn_bundle(NodeBundle {
+                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                style: Style {
+                    size: Size::new(Val::Px(1.), Val::Px(target_ui_size + 1.)),
+                    position_type: PositionType::Absolute,
+                    position: Rect {
+                        left: Val::Px(-target_ui_size / 2.),
+                        bottom: Val::Px(-target_ui_size / 2.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                ..Default::default()
+            });
+            parent.spawn_bundle(NodeBundle {
+                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                style: Style {
+                    size: Size::new(Val::Px(1.), Val::Px(target_ui_size + 1.)),
+                    position_type: PositionType::Absolute,
+                    position: Rect {
+                        left: Val::Px(target_ui_size / 2.),
+                        bottom: Val::Px(-target_ui_size / 2.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                ..Default::default()
+            });
+            parent.spawn_bundle(NodeBundle {
+                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                style: Style {
+                    size: Size::new(Val::Px(target_ui_size + 1.), Val::Px(1.)),
+                    position_type: PositionType::Absolute,
+                    position: Rect {
+                        left: Val::Px(-target_ui_size / 2.),
+                        bottom: Val::Px(target_ui_size / 2.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                ..Default::default()
+            });
+            parent.spawn_bundle(NodeBundle {
+                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                style: Style {
+                    size: Size::new(Val::Px(target_ui_size + 1.), Val::Px(1.)),
+                    position_type: PositionType::Absolute,
+                    position: Rect {
+                        left: Val::Px(-target_ui_size / 2.),
+                        bottom: Val::Px(-target_ui_size / 2.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                ..Default::default()
+            });
+        })
+        .insert(UiTarget)
+        .id()
+}
+
 fn spawn_radar_dot(
     commands: &mut Commands,
     radar: Entity,

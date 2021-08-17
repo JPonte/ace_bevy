@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::camera::*};
 
 use super::input::*;
 use super::particles::*;
-user super::sky::*;
+use super::sky::*;
 
 pub const ROLL_SPEED: f32 = 0.9;
 pub const PITCH_SPEED: f32 = 1.8;
@@ -43,7 +43,7 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands
         .spawn_bundle((
-            Transform::from_translation(Vec3::new(0.0, 800.0, 0.0)),
+            Transform::from_translation(Vec3::new(0.0, 400.0, 0.0)),
             GlobalTransform::identity(),
         ))
         .with_children(|parent| {
