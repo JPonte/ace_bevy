@@ -266,7 +266,7 @@ pub fn text_update_system(
         for mut text in query.iter_mut() {
             text.sections[0].value = format!(
                 "{:.2} Km/H\n{} m",
-                (player.velocity * 25.).round() as i32,
+                player.velocity.round() as i32,
                 (player_transform.translation.y * 5.) as i32
             );
         }

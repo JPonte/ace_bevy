@@ -1,18 +1,19 @@
 use bevy::{core::FixedTimestep, pbr::AmbientLight, prelude::*};
+use bevy_rapier3d::prelude::*;
 
 mod input;
 mod particles;
 mod player;
+mod sky;
 mod terrain;
 mod ui;
-mod sky;
 
 use input::*;
 use particles::*;
 use player::*;
+use sky::*;
 use terrain::*;
 use ui::*;
-use sky::*;
 
 const PLAYER_MOVEMENT_LABEL: &str = "player_movement";
 const FIRE_MISSILE_LABEL: &str = "fire_missile";
@@ -29,6 +30,8 @@ fn main() {
         .init_resource::<GamepadLobby>()
         .init_resource::<UiTargets>()
         .add_plugins(DefaultPlugins)
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        // .add_plugin(RapierRenderPlugin)
         .add_plugin(SkyBoxPlugin)
         .add_asset::<ParticleMaterial>()
         .insert_resource(SmokeTextures::default())
@@ -39,7 +42,12 @@ fn main() {
         .add_startup_system(setup_player.system())
         .add_system(player_input.system())
         .add_system(player_movement.system().label(PLAYER_MOVEMENT_LABEL))
-        .add_system(camera_follow_player.system().after(PLAYER_MOVEMENT_LABEL))
+        .add_system_to_stage(
+            bevy_rapier3d::physics::PhysicsStages::SyncTransforms,
+            camera_follow_player
+                .system()
+                .after(bevy_rapier3d::physics::PhysicsSystems::SyncTransforms),
+        )
         .add_system(text_update_system.system())
         .add_system_to_stage(CoreStage::PreUpdate, connection_system.system())
         .add_system(gamepad_system.system())
@@ -98,17 +106,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn_bundle((
             Transform::from_translation(Vec3::new(0.0, 350.0, -50.0)),
-            GlobalTransform::identity(),
-        ))
-        .with_children(|parent| {
-            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
-        })
-        .insert(Target)
-        .insert(Drone);
-
-    commands
-        .spawn_bundle((
-            Transform::from_translation(Vec3::new(0.0, 325.0, 0.0)),
             GlobalTransform::identity(),
         ))
         .with_children(|parent| {

@@ -1,15 +1,20 @@
+use std::ops::Mul;
+
 use bevy::{prelude::*, render::camera::*};
+use bevy_rapier3d::na::Vector3;
+use bevy_rapier3d::prelude::*;
 
 use super::input::*;
 use super::particles::*;
 use super::sky::*;
+use super::Drone;
 
-pub const ROLL_SPEED: f32 = 0.9;
-pub const PITCH_SPEED: f32 = 1.8;
-pub const YAW_SPEED: f32 = 0.25;
+pub const ROLL_SPEED: f32 = 20.;
+pub const PITCH_SPEED: f32 = 10.;
+pub const YAW_SPEED: f32 = 5.;
 pub const MIN_SPEED: f32 = 0.;
-pub const MAX_SPEED: f32 = 100.;
-pub const ACCEL: f32 = 20.;
+pub const MAX_SPEED: f32 = 750.;
+pub const ACCEL: f32 = 100.;
 pub const BRAKE: f32 = 30.;
 
 #[derive(Default)]
@@ -39,20 +44,53 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(MainCamera)
         .insert(SkyBoxCamera);
 
-    let plane: Handle<Scene> = asset_server.load("f35.gltf#Scene0");
     let mut start_transform = Transform::from_translation(Vec3::new(-700., 50., -210.));
     start_transform.look_at(Vec3::new(-600., 50., -700.), Vec3::Y);
 
-    commands
-        .spawn_bundle((start_transform, GlobalTransform::identity()))
+    let target = commands
+        .spawn_bundle((
+            Transform::from_translation(Vec3::new(0.0, 325.0, 0.0)),
+            GlobalTransform::identity(),
+        ))
         .with_children(|parent| {
-            parent.spawn_scene(plane);
+            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
+        })
+        .insert(Target)
+        .insert(Drone)
+        .id();
+
+    let rigid_body = RigidBodyBundle {
+        position: start_transform.translation.into(),
+        forces: RigidBodyForces {
+            gravity_scale: 1.,
+            ..Default::default()
+        },
+        damping: RigidBodyDamping { linear_damping: 1.5, angular_damping: 4.0 },
+        ..Default::default()
+    };
+
+    let collider = ColliderBundle {
+        shape: ColliderShape::ball(1.),
+        material: ColliderMaterial::default(),
+        ..Default::default()
+    };
+
+    commands
+        .spawn()
+        .insert(Transform::default())
+        .with_children(|parent| {
+            parent.spawn_scene(asset_server.load("f35.gltf#Scene0"));
         })
         .insert(Player {
+            target: Some(target),
             velocity: 10.,
             missiles_fired: 0,
             ..Default::default()
-        });
+        })
+        .insert_bundle(rigid_body)
+        .insert_bundle(collider)
+        .insert(RigidBodyPositionSync::Discrete)
+        .insert(ColliderDebugRender::with_id(1));
 }
 
 pub fn camera_follow_player(
@@ -86,12 +124,18 @@ pub fn camera_follow_player(
 
         camera_transform.translation = camera_transform.translation.lerp(
             new_transform.translation,
-            ((8. + (speed_ratio * 16.)) * time.delta_seconds()).clamp(0., 1.),
+            (16. * time.delta_seconds()).clamp(0., 1.),
         );
         camera_transform.rotation = camera_transform.rotation.lerp(
             new_transform.rotation,
             (5. * time.delta_seconds()).clamp(0., 1.),
         );
+
+        // let new_transform =
+        //     Transform::from_translation(player_translation + Vec3::new(-6.0, 6.0, 0.0))
+        //         .looking_at(player_translation, Vec3::Y);
+        // camera_transform.translation = new_transform.translation;
+        // camera_transform.rotation = new_transform.rotation;
     }
 
     if let Some(window) = windows.get_primary() {
@@ -143,24 +187,43 @@ pub fn player_input(
 
 pub fn player_movement(
     player_input: Res<PlayerInput>,
-    mut player_query: Query<(&mut Transform, &mut Player)>,
+    mut player_query: Query<(
+        &mut RigidBodyForces,
+        &RigidBodyVelocity,
+        &RigidBodyPosition,
+        &RigidBodyMassProps,
+        &mut Player,
+    )>,
     timer: Res<Time>,
 ) {
-    if let Some((mut player_transform, mut player)) = player_query.iter_mut().next() {
-        let pitch_delta = player_input.axis.x * timer.delta_seconds() * PITCH_SPEED;
-        let roll_delta = -player_input.axis.y * timer.delta_seconds() * ROLL_SPEED;
-        let yaw_delta = player_input.yaw * timer.delta_seconds() * YAW_SPEED;
+    if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops, mut player)) =
+        player_query.iter_mut().next()
+    {
 
-        let ypr_rotation = Quat::from_rotation_ypr(yaw_delta, pitch_delta, roll_delta);
+        let pitch_axis = -player_input.axis.y;
+        let roll_axis = player_input.axis.x;
+        let yaw_axis = player_input.yaw;
 
+        let angle_of_attack = pitch_axis * std::f32::consts::FRAC_PI_6;
+        
+        let lift_c = 1.0;
+        let lift_magintude = (rb_vel.linvel.magnitude() * lift_c).min(9.81 * rb_mprops.mass());
+        let lift_y = angle_of_attack.cos() * lift_magintude;
+        let lift_x = angle_of_attack.sin() * lift_magintude;
+
+        let lift_raw: Vector3<f32> = Vec3::new(lift_x, lift_y, 0.).into();
+        let lift: Vector3<f32> = rb_pos.position.rotation * lift_raw;
+
+        let thrust_raw: Vector3<f32> = Vec3::new( (player_input.accel * 50. + 50.) * rb_mprops.mass(), 0., 0.).into();
+        let thrust: Vector3<f32> = rb_pos.position.rotation  * thrust_raw;
+
+        let ypr_vec: Vector3<f32> = Vec3::new(roll_axis * ROLL_SPEED, yaw_axis * YAW_SPEED, pitch_axis * PITCH_SPEED).into();
+        rb_forces.torque = rb_pos.position.rotation * ypr_vec;
+        rb_forces.force = thrust + lift;
+        
         player.velocity = (player.velocity
             + (player_input.accel * ACCEL - player_input.brake * BRAKE) * timer.delta_seconds())
         .clamp(MIN_SPEED, MAX_SPEED);
-
-        player_transform.rotation = player_transform.rotation * ypr_rotation;
-
-        player_transform.translation = player_transform.translation
-            + (player_transform.rotation * Vec3::X * player.velocity * timer.delta_seconds());
     }
 }
 
@@ -181,7 +244,7 @@ pub fn fire_missle(
                     if *value > 0. {
                         commands
                             .spawn_bundle(PbrBundle {
-                                mesh: meshes.add(Mesh::from(shape::Capsule {
+                                mesh: meshes.add(Mesh::from(bevy::render::mesh::shape::Capsule {
                                     radius: 0.05,
                                     depth: 1.5,
                                     ..Default::default()
