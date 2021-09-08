@@ -10,8 +10,8 @@ use super::sky::*;
 use super::Drone;
 
 pub const ROLL_SPEED: f32 = 20.;
-pub const PITCH_SPEED: f32 = 10.;
-pub const YAW_SPEED: f32 = 5.;
+pub const PITCH_SPEED: f32 = 8.;
+pub const YAW_SPEED: f32 = 2.5;
 pub const MIN_SPEED: f32 = 0.;
 pub const MAX_SPEED: f32 = 750.;
 pub const ACCEL: f32 = 100.;
@@ -65,7 +65,10 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             gravity_scale: 1.,
             ..Default::default()
         },
-        damping: RigidBodyDamping { linear_damping: 1.5, angular_damping: 4.0 },
+        damping: RigidBodyDamping {
+            linear_damping: 0.1,
+            angular_damping: 4.0,
+        },
         ..Default::default()
     };
 
@@ -115,24 +118,27 @@ pub fn camera_follow_player(
 
     if let Some(mut camera_transform) = query_set.q0_mut().iter_mut().next() {
         let new_transform = Transform::from_translation(
-            player_translation + player_rotation * Vec3::new(-6.0, 2.0, 0.0),
+            player_translation + player_rotation * Vec3::new(-15.0, 2.5, 0.0),
         )
         .looking_at(
-            player_translation + (player_rotation * Vec3::Y).normalize() * 1.5,
+            player_translation + (player_rotation * Vec3::Y).normalize() * 1.,
             (player_rotation * Vec3::Y).normalize(),
         );
 
         camera_transform.translation = camera_transform.translation.lerp(
             new_transform.translation,
-            (16. * time.delta_seconds()).clamp(0., 1.),
+            (25. * time.delta_seconds()).clamp(0., 1.),
         );
         camera_transform.rotation = camera_transform.rotation.lerp(
             new_transform.rotation,
-            (5. * time.delta_seconds()).clamp(0., 1.),
+            (25. * time.delta_seconds()).clamp(0., 1.),
         );
 
+        // camera_transform.translation = new_transform.translation;
+        // camera_transform.rotation = new_transform.rotation;
+
         // let new_transform =
-        //     Transform::from_translation(player_translation + Vec3::new(-6.0, 6.0, 0.0))
+        //     Transform::from_translation(player_translation + Vec3::new(-15.0, 6.0, 0.0))
         //         .looking_at(player_translation, Vec3::Y);
         // camera_transform.translation = new_transform.translation;
         // camera_transform.rotation = new_transform.rotation;
@@ -199,28 +205,37 @@ pub fn player_movement(
     if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops, mut player)) =
         player_query.iter_mut().next()
     {
-
         let pitch_axis = -player_input.axis.y;
         let roll_axis = player_input.axis.x;
         let yaw_axis = player_input.yaw;
 
-        let angle_of_attack = pitch_axis * std::f32::consts::FRAC_PI_6;
-        
-        let lift_c = 1.0;
-        let lift_magintude = (rb_vel.linvel.magnitude() * lift_c).min(9.81 * rb_mprops.mass());
-        let lift_y = angle_of_attack.cos() * lift_magintude;
-        let lift_x = angle_of_attack.sin() * lift_magintude;
+        let angle_of_attack = if rb_vel.linvel.magnitude_squared() == 0. {
+            0.
+        } else {
+            - rb_vel
+                .linvel
+                .normalize()
+                .dot(&(rb_pos.position.rotation * Vector3::from(Vec3::Y)))
+        };
 
-        let lift_raw: Vector3<f32> = Vec3::new(lift_x, lift_y, 0.).into();
-        let lift: Vector3<f32> = rb_pos.position.rotation * lift_raw;
+        let lift_c = 10.;
+        let lift_magintude = rb_vel.linvel.magnitude() * lift_c * angle_of_attack;
 
-        let thrust_raw: Vector3<f32> = Vec3::new( (player_input.accel * 50. + 50.) * rb_mprops.mass(), 0., 0.).into();
-        let thrust: Vector3<f32> = rb_pos.position.rotation  * thrust_raw;
+        let lift: Vector3<f32> = rb_pos.position.rotation * Vector3::from(Vec3::Y * lift_magintude);
 
-        let ypr_vec: Vector3<f32> = Vec3::new(roll_axis * ROLL_SPEED, yaw_axis * YAW_SPEED, pitch_axis * PITCH_SPEED).into();
+        let thrust_raw: Vector3<f32> =
+            Vec3::new((player_input.accel * 50.) * rb_mprops.mass(), 0., 0.).into();
+        let thrust: Vector3<f32> = rb_pos.position.rotation * thrust_raw;
+
+        let ypr_vec: Vector3<f32> = Vec3::new(
+            roll_axis * ROLL_SPEED,
+            yaw_axis * YAW_SPEED,
+            pitch_axis * PITCH_SPEED,
+        )
+        .into();
         rb_forces.torque = rb_pos.position.rotation * ypr_vec;
         rb_forces.force = thrust + lift;
-        
+
         player.velocity = (player.velocity
             + (player_input.accel * ACCEL - player_input.brake * BRAKE) * timer.delta_seconds())
         .clamp(MIN_SPEED, MAX_SPEED);

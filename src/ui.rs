@@ -1,4 +1,5 @@
 use bevy::{prelude::*, render::camera::*};
+use bevy_rapier3d::prelude::*;
 
 use super::player::*;
 
@@ -260,13 +261,13 @@ fn spawn_radar_dot(
 
 pub fn text_update_system(
     mut query: Query<&mut Text, With<SpeedText>>,
-    player_query: Query<(&Player, &Transform)>,
+    player_query: Query<(&Transform, &RigidBodyVelocity), With<Player>>,
 ) {
-    if let Some((player, player_transform)) = player_query.iter().next() {
+    if let Some((player_transform, rb_vel)) = player_query.iter().next() {
         for mut text in query.iter_mut() {
             text.sections[0].value = format!(
                 "{:.2} Km/H\n{} m",
-                player.velocity.round() as i32,
+                (rb_vel.linvel.magnitude() * 3.6).round() as i32,
                 (player_transform.translation.y * 5.) as i32
             );
         }
