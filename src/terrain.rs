@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 use image::{self, ImageBuffer, Luma};
 
@@ -44,6 +45,7 @@ fn sample_heightmap(x: u32, y: u32, heightmap: &ImageBuffer<Luma<u8>, Vec<u8>>) 
 fn mesh_from_heightmap(
     filename: &str,
     mesh_options: TerrainMeshOptions,
+    scale_factor: f32,
 ) -> Vec<([f32; 3], [f32; 3], [f32; 2])> {
     if let Ok(terrain_bitmap) = image::open(filename) {
         let grayscaled = terrain_bitmap.grayscale();
@@ -59,7 +61,11 @@ fn mesh_from_heightmap(
             for w in 0..mesh_options.width {
                 let (x, y) = (w * step_w + offset, h * step_h + offset);
                 let (height, normal) = sample_heightmap(x, y, heightmap);
-                let vertex = [w as f32, mesh_options.height as f32 * height, h as f32];
+                let vertex = [
+                    w as f32 * scale_factor,
+                    mesh_options.height as f32 * height * scale_factor,
+                    h as f32 * scale_factor,
+                ];
                 let uv = [
                     x as f32 / heightmap.width() as f32,
                     y as f32 / heightmap.height() as f32,
@@ -82,6 +88,8 @@ pub fn setup_terrain(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let scale_factor = 2.;
+
     let vertices_vec = mesh_from_heightmap(
         "assets/heightmap.png",
         TerrainMeshOptions {
@@ -89,9 +97,11 @@ pub fn setup_terrain(
             length: WIDTH,
             height: 150,
         },
+        scale_factor,
     );
 
     let mut indices_vec = Vec::new();
+    let mut indices_vec_2 = Vec::new();
     for y in 0..(LENGTH - 1) {
         for x in 0..(WIDTH - 1) {
             indices_vec.push(x + y * LENGTH);
@@ -101,6 +111,13 @@ pub fn setup_terrain(
             indices_vec.push(x + 1 + y * LENGTH);
             indices_vec.push(x + (y + 1) * LENGTH);
             indices_vec.push(x + 1 + (y + 1) * LENGTH);
+
+            indices_vec_2.push([x + y * LENGTH, x + (y + 1) * LENGTH, x + 1 + y * LENGTH]);
+            indices_vec_2.push([
+                x + 1 + y * LENGTH,
+                x + (y + 1) * LENGTH,
+                x + 1 + (y + 1) * LENGTH,
+            ]);
         }
     }
 
@@ -115,35 +132,51 @@ pub fn setup_terrain(
         uvs.push(*uv);
     }
 
+    let collider_shape = ColliderShape::trimesh(
+        positions.iter().map(|p| Point::from_slice(p)).collect(),
+        indices_vec_2,
+    );
+
     let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
     mesh.set_indices(Some(indices));
     mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
-    let scale_factor = 2.;
-    commands.spawn_bundle(PbrBundle {
-        transform: Transform {
-            translation: Vec3::new(
+    commands
+        .spawn_bundle(PbrBundle {
+            transform: Transform {
+                translation: Vec3::new(
+                    -(WIDTH as f32 * scale_factor / 2.),
+                    0.,
+                    -(LENGTH as f32 * scale_factor / 2.),
+                ),
+                // scale: Vec3::new(scale_factor, scale_factor, scale_factor),
+                ..Default::default()
+            },
+            mesh: meshes.add(mesh),
+            material: materials.add(StandardMaterial {
+                base_color: Color::rgb(0.93, 0.79, 0.69),
+                metallic: 0.0,
+                roughness: 1.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .insert_bundle(ColliderBundle {
+            shape: collider_shape,
+            position: Vec3::new(
                 -(WIDTH as f32 * scale_factor / 2.),
                 0.,
                 -(LENGTH as f32 * scale_factor / 2.),
-            ),
-            scale: Vec3::new(scale_factor, scale_factor, scale_factor),
+            )
+            .into(),
             ..Default::default()
-        },
-        mesh: meshes.add(mesh),
-        material: materials.add(StandardMaterial {
-            base_color: Color::rgb(0.93, 0.79, 0.69),
-            metallic: 0.0,
-            roughness: 1.0,
-            ..Default::default()
-        }),
-        ..Default::default()
-    });
+        })
+        .insert(ColliderPositionSync::Discrete);
 
     commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 2000. })),
+        mesh: meshes.add(Mesh::from(bevy::render::mesh::shape::Plane { size: 2000. })),
         transform: Transform::from_translation(Vec3::new(0., 10., 0.)),
         material: materials.add(StandardMaterial {
             base_color: Color::MIDNIGHT_BLUE,

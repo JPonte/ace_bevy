@@ -1,6 +1,6 @@
-use std::ops::Mul;
-
 use bevy::{prelude::*, render::camera::*};
+use bevy_rapier3d::na::Quaternion;
+use bevy_rapier3d::na::Unit;
 use bevy_rapier3d::na::Vector3;
 use bevy_rapier3d::prelude::*;
 
@@ -15,11 +15,10 @@ pub const YAW_SPEED: f32 = 2.5;
 pub const MIN_SPEED: f32 = 0.;
 pub const MAX_SPEED: f32 = 750.;
 pub const ACCEL: f32 = 100.;
-pub const BRAKE: f32 = 30.;
+pub const BRAKE: f32 = 0.75;
 
 #[derive(Default)]
 pub struct Player {
-    pub velocity: f32,
     pub missiles_fired: u32,
     pub target: Option<Entity>,
 }
@@ -69,6 +68,14 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             linear_damping: 0.1,
             angular_damping: 4.0,
         },
+        ccd: RigidBodyCcd {
+            ccd_enabled: true,
+            ..Default::default()
+        },
+        activation: RigidBodyActivation::cannot_sleep(),
+        mass_properties: RigidBodyMassProps {
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -86,7 +93,6 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         })
         .insert(Player {
             target: Some(target),
-            velocity: 10.,
             missiles_fired: 0,
             ..Default::default()
         })
@@ -99,9 +105,10 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 pub fn camera_follow_player(
     mut query_set: QuerySet<(
         Query<&mut Transform, With<MainCamera>>,
-        Query<(&Transform, &Player)>,
+        Query<(&Transform, &RigidBodyVelocity), With<Player>>,
         Query<(&mut PerspectiveProjection, &mut Camera), With<MainCamera>>,
     )>,
+    player_input: Res<PlayerInput>,
     windows: Res<Windows>,
     time: Res<Time>,
 ) {
@@ -109,10 +116,10 @@ pub fn camera_follow_player(
     let mut player_rotation = Quat::default();
     let mut player_speed = MIN_SPEED;
 
-    if let Some((player_transform, player)) = query_set.q1().iter().next() {
+    if let Some((player_transform, rb_vel)) = query_set.q1().iter().next() {
         player_translation = player_transform.translation;
         player_rotation = player_transform.rotation;
-        player_speed = player.velocity;
+        player_speed = rb_vel.linvel.magnitude();
     }
     let speed_ratio = (player_speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
 
@@ -121,17 +128,17 @@ pub fn camera_follow_player(
             player_translation + player_rotation * Vec3::new(-15.0, 2.5, 0.0),
         )
         .looking_at(
-            player_translation + (player_rotation * Vec3::Y).normalize() * 1.,
+            player_translation + (player_rotation * Vec3::Y).normalize() * 1.5,
             (player_rotation * Vec3::Y).normalize(),
         );
 
         camera_transform.translation = camera_transform.translation.lerp(
             new_transform.translation,
-            (25. * time.delta_seconds()).clamp(0., 1.),
+            (30. * time.delta_seconds()).clamp(0., 1.),
         );
         camera_transform.rotation = camera_transform.rotation.lerp(
             new_transform.rotation,
-            (25. * time.delta_seconds()).clamp(0., 1.),
+            (30. * time.delta_seconds()).clamp(0., 1.),
         );
 
         // camera_transform.translation = new_transform.translation;
@@ -142,6 +149,12 @@ pub fn camera_follow_player(
         //         .looking_at(player_translation, Vec3::Y);
         // camera_transform.translation = new_transform.translation;
         // camera_transform.rotation = new_transform.rotation;
+
+        let camera_x = -player_input.camera_axis.x * std::f32::consts::FRAC_PI_4;
+        let camera_y = player_input.camera_axis.y * std::f32::consts::FRAC_PI_4;
+
+        let axis_rot = Quat::from_rotation_ypr(camera_x, camera_y, 0.);
+        camera_transform.rotation = camera_transform.rotation * axis_rot;
     }
 
     if let Some(window) = windows.get_primary() {
@@ -191,40 +204,58 @@ pub fn player_input(
     }
 }
 
+fn calculate_lift(
+    vel: Vector3<f32>,
+    rotation: Unit<Quaternion<f32>>,
+    surface_normal: Vector3<f32>,
+    constant: f32,
+) -> Vector3<f32> {
+    let angle_of_attack = if vel.magnitude_squared() == 0. {
+        0.
+    } else {
+        -vel.normalize().dot(&(rotation * surface_normal))
+    };
+
+    let lift_magintude = vel.magnitude() * constant * angle_of_attack;
+
+    rotation * (surface_normal * lift_magintude)
+}
+
 pub fn player_movement(
     player_input: Res<PlayerInput>,
-    mut player_query: Query<(
-        &mut RigidBodyForces,
-        &RigidBodyVelocity,
-        &RigidBodyPosition,
-        &RigidBodyMassProps,
-        &mut Player,
-    )>,
-    timer: Res<Time>,
+    mut player_query: Query<
+        (
+            &mut RigidBodyForces,
+            &RigidBodyVelocity,
+            &RigidBodyPosition,
+            &RigidBodyMassProps,
+            &mut RigidBodyDamping,
+        ),
+        With<Player>,
+    >,
 ) {
-    if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops, mut player)) =
+    if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops, mut rb_damp)) =
         player_query.iter_mut().next()
     {
         let pitch_axis = -player_input.axis.y;
         let roll_axis = player_input.axis.x;
         let yaw_axis = player_input.yaw;
 
-        let angle_of_attack = if rb_vel.linvel.magnitude_squared() == 0. {
-            0.
-        } else {
-            - rb_vel
-                .linvel
-                .normalize()
-                .dot(&(rb_pos.position.rotation * Vector3::from(Vec3::Y)))
-        };
-
-        let lift_c = 10.;
-        let lift_magintude = rb_vel.linvel.magnitude() * lift_c * angle_of_attack;
-
-        let lift: Vector3<f32> = rb_pos.position.rotation * Vector3::from(Vec3::Y * lift_magintude);
+        let lift_up = calculate_lift(
+            rb_vel.linvel,
+            rb_pos.position.rotation,
+            Vector3::from(Vec3::Y),
+            10.,
+        );
+        let lift_side = calculate_lift(
+            rb_vel.linvel,
+            rb_pos.position.rotation,
+            Vector3::from(Vec3::Z),
+            15.,
+        );
 
         let thrust_raw: Vector3<f32> =
-            Vec3::new((player_input.accel * 50.) * rb_mprops.mass(), 0., 0.).into();
+            Vec3::new((player_input.accel * ACCEL) * rb_mprops.mass(), 0., 0.).into();
         let thrust: Vector3<f32> = rb_pos.position.rotation * thrust_raw;
 
         let ypr_vec: Vector3<f32> = Vec3::new(
@@ -234,11 +265,9 @@ pub fn player_movement(
         )
         .into();
         rb_forces.torque = rb_pos.position.rotation * ypr_vec;
-        rb_forces.force = thrust + lift;
+        rb_forces.force = thrust + lift_up + lift_side;
 
-        player.velocity = (player.velocity
-            + (player_input.accel * ACCEL - player_input.brake * BRAKE) * timer.delta_seconds())
-        .clamp(MIN_SPEED, MAX_SPEED);
+        rb_damp.linear_damping = player_input.brake * BRAKE + 0.1;
     }
 }
 
@@ -247,9 +276,9 @@ pub fn fire_missle(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut gamepad_event: EventReader<GamepadEvent>,
-    mut player_query: Query<(&Transform, &mut Player)>,
+    mut player_query: Query<(&Transform, &mut Player, &RigidBodyVelocity)>,
 ) {
-    if let Some((player_transform, mut player)) = player_query.iter_mut().next() {
+    if let Some((player_transform, mut player, rb_vel)) = player_query.iter_mut().next() {
         for event in gamepad_event.iter() {
             match &event {
                 GamepadEvent(
@@ -286,7 +315,7 @@ pub fn fire_missle(
                             })
                             .insert(Missile {
                                 target: player.target,
-                                velocity: player.velocity,
+                                velocity: rb_vel.linvel.magnitude(),
                                 lifetime: 5.,
                             })
                             .insert(Emitter {

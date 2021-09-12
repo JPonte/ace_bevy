@@ -6,6 +6,7 @@ pub struct PlayerInput {
     pub accel: f32,
     pub brake: f32,
     pub yaw: f32,
+    pub camera_axis: Vec2,
 }
 
 #[derive(Default)]
@@ -78,6 +79,19 @@ pub fn gamepad_system(
         let right_shoulder = button_axes
             .get(GamepadButton(gamepad, GamepadButtonType::RightTrigger))
             .unwrap();
+
+        let right_stick_x = axes
+            .get(GamepadAxis(gamepad, GamepadAxisType::RightStickX))
+            .unwrap();
+        let right_stick_y = axes
+            .get(GamepadAxis(gamepad, GamepadAxisType::RightStickY))
+            .unwrap();
+
+        if right_stick_x.abs() > 0.1 || right_stick_y.abs() > 0.1 {
+            player_input.camera_axis = Vec2::new(right_stick_x, right_stick_y);
+        } else {
+            player_input.camera_axis = Vec2::ZERO;
+        }
 
         player_input.yaw = left_shoulder - right_shoulder;
     }
