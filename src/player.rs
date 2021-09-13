@@ -124,10 +124,15 @@ pub fn camera_follow_player(
     let speed_ratio = (player_speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
 
     if let Some(mut camera_transform) = query_set.q0_mut().iter_mut().next() {
-        let new_transform = Transform::from_translation(
-            player_translation + player_rotation * Vec3::new(-15.0, 2.5, 0.0),
-        )
-        .looking_at(
+        let camera_x = -player_input.camera_axis.x * std::f32::consts::PI;
+        let camera_y = player_input.camera_axis.y * std::f32::consts::FRAC_2_PI;
+
+        let axis_rot = Quat::from_rotation_ypr(camera_x, 0., camera_y);
+
+        let mut new_transform = Transform::from_translation(
+            player_translation + player_rotation * axis_rot * Vec3::new(-15.0, 2.5, 0.0),
+        );
+        new_transform = new_transform.looking_at(
             player_translation + (player_rotation * Vec3::Y).normalize() * 1.5,
             (player_rotation * Vec3::Y).normalize(),
         );
@@ -149,12 +154,6 @@ pub fn camera_follow_player(
         //         .looking_at(player_translation, Vec3::Y);
         // camera_transform.translation = new_transform.translation;
         // camera_transform.rotation = new_transform.rotation;
-
-        let camera_x = -player_input.camera_axis.x * std::f32::consts::FRAC_PI_4;
-        let camera_y = player_input.camera_axis.y * std::f32::consts::FRAC_PI_4;
-
-        let axis_rot = Quat::from_rotation_ypr(camera_x, camera_y, 0.);
-        camera_transform.rotation = camera_transform.rotation * axis_rot;
     }
 
     if let Some(window) = windows.get_primary() {
