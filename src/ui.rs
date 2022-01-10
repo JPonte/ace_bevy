@@ -4,9 +4,17 @@ use bevy_rapier3d::prelude::*;
 use super::player::*;
 
 const RADAR_RANGE: f32 = 1000.;
+
+#[derive(Component)]
 pub struct Radar;
+
+#[derive(Component)]
 pub struct RadarDot;
+
+#[derive(Component)]
 pub struct SpeedText;
+
+#[derive(Component)]
 pub struct UiTarget;
 
 #[derive(Default)]
@@ -63,7 +71,7 @@ pub fn setup_ui(
                 },
                 ..Default::default()
             },
-            material: color_materials.add(Color::rgb(0.0, 0.15, 0.).into()),
+            color: Color::rgb(0.0, 0.15, 0.).into(),
             ..Default::default()
         })
         .insert(Radar)
@@ -79,7 +87,7 @@ pub fn setup_ui(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 0.5, 1.).into()),
+                color: Color::rgb(0.0, 0.5, 1.).into(),
                 ..Default::default()
             });
         });
@@ -105,7 +113,7 @@ fn spawn_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
@@ -119,7 +127,7 @@ fn spawn_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
@@ -133,7 +141,7 @@ fn spawn_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
@@ -147,7 +155,7 @@ fn spawn_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
         })
@@ -162,12 +170,15 @@ fn spawn_player_target(
     let target_ui_size = 30.;
 
     commands
-        .spawn_bundle(NodeBundle{
+        .spawn_bundle(NodeBundle {
             ..Default::default()
         })
         .with_children(|parent| {
             parent.spawn_bundle(NodeBundle {
-                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                transform: Transform::from_rotation(Quat::from_axis_angle(
+                    Vec3::Z,
+                    std::f32::consts::FRAC_PI_4,
+                )),
                 style: Style {
                     size: Size::new(Val::Px(1.), Val::Px(target_ui_size + 1.)),
                     position_type: PositionType::Absolute,
@@ -178,11 +189,14 @@ fn spawn_player_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
-                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                transform: Transform::from_rotation(Quat::from_axis_angle(
+                    Vec3::Z,
+                    std::f32::consts::FRAC_PI_4,
+                )),
                 style: Style {
                     size: Size::new(Val::Px(1.), Val::Px(target_ui_size + 1.)),
                     position_type: PositionType::Absolute,
@@ -193,11 +207,14 @@ fn spawn_player_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
-                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                transform: Transform::from_rotation(Quat::from_axis_angle(
+                    Vec3::Z,
+                    std::f32::consts::FRAC_PI_4,
+                )),
                 style: Style {
                     size: Size::new(Val::Px(target_ui_size + 1.), Val::Px(1.)),
                     position_type: PositionType::Absolute,
@@ -208,11 +225,14 @@ fn spawn_player_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
             parent.spawn_bundle(NodeBundle {
-                transform: Transform::from_rotation(Quat::from_axis_angle(Vec3::Z, std::f32::consts::FRAC_PI_4)),
+                transform: Transform::from_rotation(Quat::from_axis_angle(
+                    Vec3::Z,
+                    std::f32::consts::FRAC_PI_4,
+                )),
                 style: Style {
                     size: Size::new(Val::Px(target_ui_size + 1.), Val::Px(1.)),
                     position_type: PositionType::Absolute,
@@ -223,7 +243,7 @@ fn spawn_player_target(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             });
         })
@@ -236,7 +256,7 @@ fn spawn_radar_dot(
     radar: Entity,
     color_materials: &mut ResMut<Assets<ColorMaterial>>,
 ) -> Entity {
-    let mut child_id: Entity = Entity::new(0);
+    let mut child_id: Entity = Entity::from_raw(0);
     commands.entity(radar).with_children(|parent| {
         child_id = parent
             .spawn_bundle(NodeBundle {
@@ -250,7 +270,7 @@ fn spawn_radar_dot(
                     },
                     ..Default::default()
                 },
-                material: color_materials.add(Color::rgb(0.0, 1., 0.).into()),
+                color: Color::rgb(0.0, 1., 0.).into(),
                 ..Default::default()
             })
             .insert(RadarDot)
@@ -261,7 +281,7 @@ fn spawn_radar_dot(
 
 pub fn text_update_system(
     mut query: Query<&mut Text, With<SpeedText>>,
-    player_query: Query<(&Transform, &RigidBodyVelocity), With<Player>>,
+    player_query: Query<(&Transform, &RigidBodyVelocityComponent), With<Player>>,
 ) {
     if let Some((player_transform, rb_vel)) = player_query.iter().next() {
         for mut text in query.iter_mut() {
@@ -284,8 +304,8 @@ pub fn target_ui(
     mut commands: Commands,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let player_target = player_query.single().map(|p| p.target).unwrap();
-    let (camera, camera_global_transform) = camera_query.single().unwrap();
+    let player_target = player_query.single().target;
+    let (camera, camera_global_transform) = camera_query.single();
 
     let targets_to_draw: Vec<Vec2> = target_query
         .iter()
@@ -337,8 +357,8 @@ pub fn radar(
     mut commands: Commands,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let radar = radar_query.single().unwrap();
-    let player_transform = player_query.single().unwrap();
+    let radar = radar_query.single();
+    let player_transform = player_query.single();
     let player_pos = Vec3::new(
         player_transform.translation.x,
         0.,

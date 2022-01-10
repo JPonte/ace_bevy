@@ -5,7 +5,7 @@ use bevy_rapier3d::na::Vector3;
 use bevy_rapier3d::prelude::*;
 
 use super::input::*;
-use super::particles::*;
+// use super::particles::*;
 use super::sky::*;
 use super::Drone;
 
@@ -17,17 +17,23 @@ pub const MAX_SPEED: f32 = 750.;
 pub const ACCEL: f32 = 100.;
 pub const BRAKE: f32 = 0.75;
 
-#[derive(Default)]
+#[derive(Default, Component)]
 pub struct Player {
     pub missiles_fired: u32,
     pub target: Option<Entity>,
 }
+
+#[derive(Component)]
 pub struct MainCamera;
+
+#[derive(Component)]
 pub struct Missile {
     pub target: Option<Entity>,
     pub velocity: f32,
     pub lifetime: f32,
 }
+
+#[derive(Component)]
 pub struct Target;
 
 pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -60,28 +66,28 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     let rigid_body = RigidBodyBundle {
         position: start_transform.translation.into(),
-        forces: RigidBodyForces {
+        forces: RigidBodyForcesComponent(RigidBodyForces {
             gravity_scale: 1.,
             ..Default::default()
-        },
-        damping: RigidBodyDamping {
+        }),
+        damping: RigidBodyDampingComponent(RigidBodyDamping {
             linear_damping: 0.1,
             angular_damping: 4.0,
-        },
-        ccd: RigidBodyCcd {
+        }),
+        ccd: RigidBodyCcdComponent(RigidBodyCcd {
             ccd_enabled: true,
             ..Default::default()
-        },
-        activation: RigidBodyActivation::cannot_sleep(),
-        mass_properties: RigidBodyMassProps {
+        }),
+        activation: RigidBodyActivationComponent(RigidBodyActivation::cannot_sleep()),
+        mass_properties: RigidBodyMassPropsComponent(RigidBodyMassProps {
             ..Default::default()
-        },
+        }),
         ..Default::default()
     };
 
     let collider = ColliderBundle {
-        shape: ColliderShape::ball(1.),
-        material: ColliderMaterial::default(),
+        shape: ColliderShapeComponent(ColliderShape::ball(1.)),
+        material: ColliderMaterialComponent(ColliderMaterial::default()),
         ..Default::default()
     };
 
@@ -104,9 +110,9 @@ pub fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 pub fn camera_follow_player(
     mut query_set: QuerySet<(
-        Query<&mut Transform, With<MainCamera>>,
-        Query<(&Transform, &RigidBodyVelocity), With<Player>>,
-        Query<(&mut PerspectiveProjection, &mut Camera), With<MainCamera>>,
+        QueryState<&mut Transform, With<MainCamera>>,
+        QueryState<(&Transform, &RigidBodyVelocityComponent), With<Player>>,
+        QueryState<(&mut PerspectiveProjection, &mut Camera), With<MainCamera>>,
     )>,
     player_input: Res<PlayerInput>,
     windows: Res<Windows>,
@@ -123,11 +129,11 @@ pub fn camera_follow_player(
     }
     let speed_ratio = (player_speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
 
-    if let Some(mut camera_transform) = query_set.q0_mut().iter_mut().next() {
+    if let Some(mut camera_transform) = query_set.q0().iter_mut().next() {
         let camera_x = -player_input.camera_axis.x * std::f32::consts::PI;
         let camera_y = player_input.camera_axis.y * std::f32::consts::FRAC_2_PI;
 
-        let axis_rot = Quat::from_rotation_ypr(camera_x, 0., camera_y);
+        let axis_rot = Quat::from_rotation_x(camera_x) * Quat::from_rotation_z(camera_y);
 
         let mut new_transform = Transform::from_translation(
             player_translation + player_rotation * axis_rot * Vec3::new(-15.0, 2.5, 0.0),
@@ -137,14 +143,10 @@ pub fn camera_follow_player(
             (player_rotation * Vec3::Y).normalize(),
         );
 
-        camera_transform.translation = camera_transform.translation.lerp(
-            new_transform.translation,
-            (30. * time.delta_seconds()).clamp(0., 1.),
-        );
-        camera_transform.rotation = camera_transform.rotation.lerp(
-            new_transform.rotation,
-            (30. * time.delta_seconds()).clamp(0., 1.),
-        );
+        camera_transform.translation = camera_transform
+            .translation
+            .lerp(new_transform.translation, 0.4);
+        camera_transform.rotation = camera_transform.rotation.lerp(new_transform.rotation, 0.4);
 
         // camera_transform.translation = new_transform.translation;
         // camera_transform.rotation = new_transform.rotation;
@@ -157,14 +159,14 @@ pub fn camera_follow_player(
     }
 
     if let Some(window) = windows.get_primary() {
-        let (mut perspective_projection, mut camera) = query_set.q2_mut().single_mut().unwrap();
+        for (mut perspective_projection, mut camera) in query_set.q2().iter_mut() {
+            perspective_projection.fov =
+                std::f32::consts::PI / 3.0 + (speed_ratio * std::f32::consts::PI / 8.);
 
-        perspective_projection.fov =
-            std::f32::consts::PI / 3.0 + (speed_ratio * std::f32::consts::PI / 8.);
-
-        perspective_projection.update(window.width(), window.height());
-        camera.projection_matrix = perspective_projection.get_projection_matrix();
-        camera.depth_calculation = perspective_projection.depth_calculation();
+            perspective_projection.update(window.width(), window.height());
+            camera.projection_matrix = perspective_projection.get_projection_matrix();
+            camera.depth_calculation = perspective_projection.depth_calculation();
+        }
     }
 }
 
@@ -224,11 +226,11 @@ pub fn player_movement(
     player_input: Res<PlayerInput>,
     mut player_query: Query<
         (
-            &mut RigidBodyForces,
-            &RigidBodyVelocity,
-            &RigidBodyPosition,
-            &RigidBodyMassProps,
-            &mut RigidBodyDamping,
+            &mut RigidBodyForcesComponent,
+            &RigidBodyVelocityComponent,
+            &RigidBodyPositionComponent,
+            &RigidBodyMassPropsComponent,
+            &mut RigidBodyDampingComponent,
         ),
         With<Player>,
     >,
@@ -275,7 +277,7 @@ pub fn fire_missle(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut gamepad_event: EventReader<GamepadEvent>,
-    mut player_query: Query<(&Transform, &mut Player, &RigidBodyVelocity)>,
+    mut player_query: Query<(&Transform, &mut Player, &RigidBodyVelocityComponent)>,
 ) {
     if let Some((player_transform, mut player, rb_vel)) = player_query.iter_mut().next() {
         for event in gamepad_event.iter() {
@@ -317,13 +319,14 @@ pub fn fire_missle(
                                 velocity: rb_vel.linvel.magnitude(),
                                 lifetime: 5.,
                             })
-                            .insert(Emitter {
-                                direction: Vec3::X,
-                                spread: 0.,
-                                speed: 0.5,
-                                lifetime: 3.,
-                                last_emitted: None,
-                            });
+                            // .insert(Emitter {
+                            //     direction: Vec3::X,
+                            //     spread: 0.,
+                            //     speed: 0.5,
+                            //     lifetime: 3.,
+                            //     last_emitted: None,
+                            // })
+                            ;
                         player.missiles_fired = player.missiles_fired + 1;
                     }
                 }
@@ -337,8 +340,8 @@ pub fn missle_run(
     mut commands: Commands,
     mut missile_query: Query<(&mut Missile, Entity)>,
     mut transforms_query: QuerySet<(
-        Query<&mut Transform, With<Missile>>,
-        Query<&Transform, With<Target>>,
+        QueryState<&mut Transform, With<Missile>>,
+        QueryState<&Transform, With<Target>>,
     )>,
     time: Res<Time>,
 ) {
@@ -348,36 +351,38 @@ pub fn missle_run(
             target_transform.translation
         });
 
-        let mut missile_transform = transforms_query.q0_mut().get_mut(missile_entity).unwrap();
-        let current_dir = (missile_transform.rotation * Vec3::Y).normalize_or_zero();
+        for mut missile_transform in transforms_query.q0().get_mut(missile_entity) {
+            let current_dir = (missile_transform.rotation * Vec3::Y).normalize_or_zero();
 
-        let target_dir = match target_translation {
-            Some(dir) => (dir - missile_transform.translation).normalize_or_zero(),
-            None => current_dir,
-        };
+            let target_dir = match target_translation {
+                Some(dir) => (dir - missile_transform.translation).normalize_or_zero(),
+                None => current_dir,
+            };
 
-        let velocity = if current_dir.angle_between(target_dir).abs() < std::f32::consts::FRAC_PI_2
-        {
-            current_dir
-                .lerp(target_dir, time.delta_seconds() * 1.5)
-                .normalize_or_zero()
-                * missile.velocity
-        } else {
-            current_dir * missile.velocity
-        };
+            let velocity =
+                if current_dir.angle_between(target_dir).abs() < std::f32::consts::FRAC_PI_2 {
+                    current_dir
+                        .lerp(target_dir, time.delta_seconds() * 1.5)
+                        .normalize_or_zero()
+                        * missile.velocity
+                } else {
+                    current_dir * missile.velocity
+                };
 
-        missile.velocity = (missile.velocity + time.delta_seconds() * 50.).clamp(0., 400.);
+            missile.velocity = (missile.velocity + time.delta_seconds() * 50.).clamp(0., 400.);
 
-        missile_transform.translation =
-            missile_transform.translation + velocity * time.delta_seconds();
-        missile_transform.rotation = Quat::from_rotation_arc(Vec3::Y, velocity.normalize_or_zero());
+            missile_transform.translation =
+                missile_transform.translation + velocity * time.delta_seconds();
+            missile_transform.rotation =
+                Quat::from_rotation_arc(Vec3::Y, velocity.normalize_or_zero());
 
-        let distance_to_target = target_translation
-            .map(|t| (t - missile_transform.translation).length())
-            .unwrap_or(f32::INFINITY);
-        missile.lifetime -= time.delta_seconds();
-        if distance_to_target < 2. || missile.lifetime < 0. {
-            commands.entity(missile_entity).despawn_recursive();
+            let distance_to_target = target_translation
+                .map(|t| (t - missile_transform.translation).length())
+                .unwrap_or(f32::INFINITY);
+            missile.lifetime -= time.delta_seconds();
+            if distance_to_target < 2. || missile.lifetime < 0. {
+                commands.entity(missile_entity).despawn_recursive();
+            }
         }
     }
 }

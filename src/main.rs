@@ -2,14 +2,14 @@ use bevy::{core::FixedTimestep, pbr::AmbientLight, prelude::*};
 use bevy_rapier3d::prelude::*;
 
 mod input;
-mod particles;
+// mod particles;
 mod player;
 mod sky;
 mod terrain;
 mod ui;
 
 use input::*;
-use particles::*;
+// use particles::*;
 use player::*;
 use sky::*;
 use terrain::*;
@@ -19,7 +19,7 @@ const PLAYER_MOVEMENT_LABEL: &str = "player_movement";
 const FIRE_MISSILE_LABEL: &str = "fire_missile";
 
 fn main() {
-    App::build()
+    App::new()
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(WindowDescriptor {
             title: "Ace Bevy!".to_string(),
@@ -33,9 +33,9 @@ fn main() {
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         // .add_plugin(RapierRenderPlugin)
         .add_plugin(SkyBoxPlugin)
-        .add_asset::<ParticleMaterial>()
-        .insert_resource(SmokeTextures::default())
-        .add_startup_system(setup_particles.system())
+        // .add_asset::<ParticleMaterial>()
+        // .insert_resource(SmokeTextures::default())
+        // .add_startup_system(setup_particles.system())
         .add_startup_system(setup.system())
         .add_startup_system(setup_terrain.system())
         .add_startup_system(setup_ui.system())
@@ -56,15 +56,16 @@ fn main() {
         .add_system(missle_run.system().after(FIRE_MISSILE_LABEL))
         .add_system(radar.system())
         .add_system(drone_movement.system())
-        .add_system(
-            run_emitter
-                .system()
-                .with_run_criteria(FixedTimestep::step(0.05)),
-        )
-        .add_system(run_particles.system())
+        // .add_system(
+        //     run_emitter
+        //         .system()
+        //         .with_run_criteria(FixedTimestep::step(0.05)),
+        // )
+        // .add_system(run_particles.system())
         .run();
 }
 
+#[derive(Component)]
 pub struct Drone;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -73,24 +74,13 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         brightness: 0.01,
     });
 
-    for x in -1..2 {
-        for y in -1..2 {
-            commands.spawn_bundle(LightBundle {
-                light: Light {
-                    color: Color::WHITE,
-                    intensity: 20000.,
-                    range: 20000.,
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(
-                    x as f32 * 500.,
-                    350.0,
-                    y as f32 * 500.,
-                )),
-                ..Default::default()
-            });
-        }
-    }
+    commands.spawn_bundle(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            illuminance: 10000.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 
     commands
         .spawn_bundle((
@@ -119,11 +109,13 @@ fn drone_movement(mut drone_query: Query<(&mut Transform, &Drone)>, timer: Res<T
     for (mut drone_transform, _) in drone_query.iter_mut() {
         let pitch_delta = 0. * timer.delta_seconds() * PITCH_SPEED;
         let roll_delta = 0. * timer.delta_seconds() * ROLL_SPEED;
-        let yaw_delta = 0.5 * timer.delta_seconds() * YAW_SPEED;
+        let yaw_delta = 0.25 * timer.delta_seconds() * YAW_SPEED;
 
-        let ypr_rotation = Quat::from_rotation_ypr(yaw_delta, pitch_delta, roll_delta);
+        let ypr_rotation = Quat::from_rotation_x(roll_delta)
+            * Quat::from_rotation_y(yaw_delta)
+            * Quat::from_rotation_z(pitch_delta);
 
-        let velocity = 90.;
+        let velocity = 190.;
 
         drone_transform.rotation = drone_transform.rotation * ypr_rotation;
 

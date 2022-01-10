@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 
-
+#[derive(Component)]
 pub struct Emitter {
     pub direction: Vec3,
     pub spread: f32,
@@ -21,6 +21,7 @@ pub struct Emitter {
     pub last_emitted: Option<Entity>,
 }
 
+#[derive(Component)]
 pub struct Particle {
     vel: Vec3,
     lifetime: f32,
@@ -118,13 +119,13 @@ pub fn setup_particles(
 pub fn run_particles(
     mut commands: Commands,
     mut query_set: QuerySet<(
-        Query<&Transform, With<Camera>>,
-        Query<(
+        QueryState<&Transform, With<Camera>>,
+        QueryState<(
             &mut Transform,
             &mut Particle,
             Entity,
         )>,
-        Query<(&Transform, &Particle, &Handle<ParticleMaterial>)>,
+        QueryState<(&Transform, &Particle, &Handle<ParticleMaterial>)>,
     )>,
     time: Res<Time>,
     mut materials: ResMut<Assets<ParticleMaterial>>,

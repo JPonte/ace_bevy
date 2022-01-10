@@ -137,7 +137,7 @@ pub fn setup_terrain(
         indices_vec_2,
     );
 
-    let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
+    let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList);
     mesh.set_indices(Some(indices));
     mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
@@ -158,13 +158,13 @@ pub fn setup_terrain(
             material: materials.add(StandardMaterial {
                 base_color: Color::rgb(0.93, 0.79, 0.69),
                 metallic: 0.0,
-                roughness: 1.0,
+                perceptual_roughness: 1.0,
                 ..Default::default()
             }),
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
-            shape: collider_shape,
+            shape: ColliderShapeComponent(collider_shape),
             position: Vec3::new(
                 -(WIDTH as f32 * scale_factor / 2.),
                 0.,
@@ -180,7 +180,7 @@ pub fn setup_terrain(
         transform: Transform::from_translation(Vec3::new(0., 10., 0.)),
         material: materials.add(StandardMaterial {
             base_color: Color::MIDNIGHT_BLUE,
-            roughness: 0.7,
+            perceptual_roughness: 0.7,
             metallic: 0.3,
             ..Default::default()
         }),
