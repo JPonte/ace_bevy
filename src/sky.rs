@@ -17,7 +17,7 @@ pub struct SkyBoxPlugin;
 
 impl Plugin for SkyBoxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_asset::<SkyMaterial>()
+        app.add_plugin(MaterialPlugin::<SkyMaterial>::default())
             .add_startup_system(setup.system())
             .add_system(sky_follow_camera.system());
     }
@@ -27,10 +27,10 @@ impl Plugin for SkyBoxPlugin {
 pub struct SkyBoxCamera;
 
 #[derive(Debug, Clone, TypeUuid)]
-#[uuid = "4bcf7ab2-cd23-4842-9698-a0e7c16093ea"]
+#[uuid = "4ee9c363-1124-4113-890e-199d81b00281"]
 struct SkyMaterial {
-    pub color_top: Color,
-    pub color_bottom: Color,
+    color_top: Color,
+    color_bottom: Color,
 }
 
 #[derive(Clone, Default, AsStd140)]
@@ -52,7 +52,7 @@ fn setup(
 ) {
     commands.spawn_bundle(MaterialMeshBundle {
         transform: Transform::from_translation(Vec3::new(0., 0.0, 0.0)),
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 200. })),
+        mesh: meshes.add(Mesh::from(shape::Cube { size: 2500. })),
         material: materials.add(SkyMaterial {
             color_top: Color::rgb(0.3, 0.56, 0.83),
             color_bottom: Color::rgb(0.7, 0.7, 1.0),
@@ -91,11 +91,12 @@ impl RenderAsset for SkyMaterial {
         (render_device, material_pipeline): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
         let data = SkyMaterialUniformData {
-            color_top: Vec4::from_slice(&extracted_asset.color_top.as_linear_rgba_f32()),
-            color_bottom: Vec4::from_slice(&extracted_asset.color_bottom.as_linear_rgba_f32()),
+            color_top: extracted_asset.color_top.as_linear_rgba_f32().into(),
+            color_bottom: extracted_asset.color_bottom.as_linear_rgba_f32().into(),
         };
+
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            contents: data.color_top.as_std140().as_bytes(),
+            contents: data.as_std140().as_bytes(),
             label: None,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
@@ -116,18 +117,16 @@ impl RenderAsset for SkyMaterial {
 }
 
 impl SpecializedMaterial for SkyMaterial {
-
     type Key = ();
 
     fn key(_: &<SkyMaterial as RenderAsset>::PreparedAsset) -> Self::Key {}
 
     fn specialize(_: Self::Key, descriptor: &mut RenderPipelineDescriptor) {
-        // descriptor.primitive.cull_mode = None;
         descriptor.primitive.front_face = FrontFace::Cw;
     }
-    
+
     fn fragment_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(asset_server.load("sky.wgsl"))
+        Some(asset_server.load("shaders/sky.wgsl"))
     }
 
     fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
@@ -142,7 +141,9 @@ impl SpecializedMaterial for SkyMaterial {
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: BufferSize::new(Vec4::std140_size_static() as u64),
+                    min_binding_size: BufferSize::new(
+                        SkyMaterialUniformData::std140_size_static() as u64
+                    ),
                 },
                 count: None,
             }],

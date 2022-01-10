@@ -133,7 +133,7 @@ pub fn camera_follow_player(
         let camera_x = -player_input.camera_axis.x * std::f32::consts::PI;
         let camera_y = player_input.camera_axis.y * std::f32::consts::FRAC_2_PI;
 
-        let axis_rot = Quat::from_rotation_x(camera_x) * Quat::from_rotation_z(camera_y);
+        let axis_rot = Quat::from_rotation_y(camera_x) * Quat::from_rotation_z(camera_y);
 
         let mut new_transform = Transform::from_translation(
             player_translation + player_rotation * axis_rot * Vec3::new(-15.0, 2.5, 0.0),

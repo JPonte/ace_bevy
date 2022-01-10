@@ -76,9 +76,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            illuminance: 10000.0,
+            illuminance: 7500.0,
             ..Default::default()
         },
+        transform: Transform::from_rotation(Quat::from_rotation_x(- std::f32::consts::FRAC_PI_8)),
         ..Default::default()
     });
 
