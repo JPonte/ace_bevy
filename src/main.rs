@@ -27,7 +27,6 @@ fn main() {
         })
         .insert_resource(ClearColor(Color::rgb(0.3, 0.56, 0.83)))
         .insert_resource(PlayerInput::default())
-        .init_resource::<GamepadLobby>()
         .init_resource::<UiTargets>()
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
@@ -49,7 +48,7 @@ fn main() {
                 .after(bevy_rapier3d::physics::PhysicsSystems::SyncTransforms),
         )
         .add_system(text_update_system.system())
-        .add_system_to_stage(CoreStage::PreUpdate, connection_system.system())
+        // .add_system_to_stage(CoreStage::PreUpdate, connection_system.system())
         .add_system(gamepad_system.system())
         .add_system(target_ui.system())
         .add_system(fire_missle.system().label(FIRE_MISSILE_LABEL))

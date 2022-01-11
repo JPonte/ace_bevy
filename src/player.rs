@@ -173,9 +173,9 @@ pub fn camera_follow_player(
 pub fn player_input(
     mut player_input: ResMut<PlayerInput>,
     keyboard_input: Res<Input<KeyCode>>,
-    lobby: Res<GamepadLobby>,
+    gamepads: Res<Gamepads>,
 ) {
-    if lobby.gamepads.is_empty() {
+    if gamepads.iter().count() == 0 {
         let mut axis = Vec2::ZERO;
         if keyboard_input.pressed(KeyCode::Left) {
             axis.x += -1.;

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashSet};
+use bevy::{input::gamepad::GamepadButton, prelude::*};
 
 #[derive(Default)]
 pub struct PlayerInput {
@@ -9,37 +9,14 @@ pub struct PlayerInput {
     pub camera_axis: Vec2,
 }
 
-#[derive(Default)]
-pub struct GamepadLobby {
-    pub gamepads: HashSet<Gamepad>,
-}
-
-pub fn connection_system(
-    mut lobby: ResMut<GamepadLobby>,
-    mut gamepad_event: EventReader<GamepadEvent>,
-) {
-    for event in gamepad_event.iter() {
-        match &event {
-            GamepadEvent(gamepad, GamepadEventType::Connected) => {
-                lobby.gamepads.insert(*gamepad);
-                println!("{:?} Connected", gamepad);
-            }
-            GamepadEvent(gamepad, GamepadEventType::Disconnected) => {
-                lobby.gamepads.remove(gamepad);
-                println!("{:?} Disconnected", gamepad);
-            }
-            _ => (),
-        }
-    }
-}
-
 pub fn gamepad_system(
-    lobby: Res<GamepadLobby>,
+    gamepads: Res<Gamepads>,
+    _button_inputs: Res<Input<GamepadButton>>,
     button_axes: Res<Axis<GamepadButton>>,
     axes: Res<Axis<GamepadAxis>>,
     mut player_input: ResMut<PlayerInput>,
 ) {
-    for gamepad in lobby.gamepads.iter().cloned() {
+    for gamepad in gamepads.iter().cloned() {
         let right_trigger = button_axes
             .get(GamepadButton(gamepad, GamepadButtonType::RightTrigger2))
             .unwrap();
