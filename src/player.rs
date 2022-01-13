@@ -13,9 +13,9 @@ pub const ROLL_SPEED: f32 = 20.;
 pub const PITCH_SPEED: f32 = 8.;
 pub const YAW_SPEED: f32 = 2.5;
 pub const MIN_SPEED: f32 = 0.;
-pub const MAX_SPEED: f32 = 750.;
-pub const ACCEL: f32 = 100.;
-pub const BRAKE: f32 = 0.75;
+pub const MAX_SPEED: f32 = 500.;
+pub const ACCEL: f32 = 75.;
+pub const BRAKE: f32 = 0.05;
 
 #[derive(Default, Component)]
 pub struct Player {
@@ -136,17 +136,17 @@ pub fn camera_follow_player(
         let axis_rot = Quat::from_rotation_y(camera_x) * Quat::from_rotation_z(camera_y);
 
         let mut new_transform = Transform::from_translation(
-            player_translation + player_rotation * axis_rot * Vec3::new(-15.0, 2.5, 0.0),
+            player_translation + player_rotation * axis_rot * Vec3::new(-6.0, 0.8, 0.0),
         );
         new_transform = new_transform.looking_at(
-            player_translation + (player_rotation * Vec3::Y).normalize() * 1.5,
+            player_translation + (player_rotation * Vec3::Y).normalize() * 0.8,
             (player_rotation * Vec3::Y).normalize(),
         );
 
         camera_transform.translation = camera_transform
             .translation
-            .lerp(new_transform.translation, 0.4);
-        camera_transform.rotation = camera_transform.rotation.lerp(new_transform.rotation, 0.4);
+            .lerp(new_transform.translation, 0.75);
+        camera_transform.rotation = camera_transform.rotation.lerp(new_transform.rotation, 0.75);
 
         // camera_transform.translation = new_transform.translation;
         // camera_transform.rotation = new_transform.rotation;
@@ -161,7 +161,7 @@ pub fn camera_follow_player(
     if let Some(window) = windows.get_primary() {
         for (mut perspective_projection, mut camera) in query_set.q2().iter_mut() {
             perspective_projection.fov =
-                std::f32::consts::PI / 3.0 + (speed_ratio * std::f32::consts::PI / 8.);
+                std::f32::consts::PI / 3.0 + (speed_ratio * std::f32::consts::PI / 4.);
 
             perspective_projection.update(window.width(), window.height());
             camera.projection_matrix = perspective_projection.get_projection_matrix();
@@ -230,14 +230,11 @@ pub fn player_movement(
             &RigidBodyVelocityComponent,
             &RigidBodyPositionComponent,
             &RigidBodyMassPropsComponent,
-            &mut RigidBodyDampingComponent,
         ),
         With<Player>,
     >,
 ) {
-    if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops, mut rb_damp)) =
-        player_query.iter_mut().next()
-    {
+    if let Some((mut rb_forces, rb_vel, rb_pos, rb_mprops)) = player_query.iter_mut().next() {
         let pitch_axis = -player_input.axis.y;
         let roll_axis = player_input.axis.x;
         let yaw_axis = player_input.yaw;
@@ -256,8 +253,23 @@ pub fn player_movement(
         );
 
         let thrust_raw: Vector3<f32> =
-            Vec3::new((player_input.accel * ACCEL) * rb_mprops.mass(), 0., 0.).into();
+            Vec3::new(player_input.accel * ACCEL * rb_mprops.mass(), 0., 0.).into();
         let thrust: Vector3<f32> = rb_pos.position.rotation * thrust_raw;
+
+        let drag_amount = 0.01 * f32::powi(rb_vel.linvel.magnitude(), 2);
+        let drag = if drag_amount == 0.0 {
+            Vec3::ZERO.into()
+        } else {
+            rb_vel.linvel.normalize() * -drag_amount
+        };
+
+        let brake_raw: Vector3<f32> = Vec3::new(
+            -player_input.brake * BRAKE * f32::powi(rb_vel.linvel.magnitude(), 2),
+            0.,
+            0.,
+        )
+        .into();
+        let brake: Vector3<f32> = rb_pos.position.rotation * brake_raw;
 
         let ypr_vec: Vector3<f32> = Vec3::new(
             roll_axis * ROLL_SPEED,
@@ -266,9 +278,7 @@ pub fn player_movement(
         )
         .into();
         rb_forces.torque = rb_pos.position.rotation * ypr_vec;
-        rb_forces.force = thrust + lift_up + lift_side;
-
-        rb_damp.linear_damping = player_input.brake * BRAKE + 0.1;
+        rb_forces.force = thrust + lift_up + lift_side + drag + brake;
     }
 }
 
@@ -290,8 +300,8 @@ pub fn fire_missle(
                         commands
                             .spawn_bundle(PbrBundle {
                                 mesh: meshes.add(Mesh::from(bevy::render::mesh::shape::Capsule {
-                                    radius: 0.05,
-                                    depth: 1.5,
+                                    radius: 0.03,
+                                    depth: 0.5,
                                     ..Default::default()
                                 })),
                                 material: materials.add(StandardMaterial {
@@ -300,13 +310,13 @@ pub fn fire_missle(
                                 }),
                                 transform: Transform {
                                     translation: player_transform.translation
-                                        - (player_transform.rotation * Vec3::Y * 0.5)
+                                        - (player_transform.rotation * Vec3::Y * 0.25)
                                         + player_transform.rotation
                                             * Vec3::Z
                                             * if player.missiles_fired % 2 == 0 {
-                                                1.
+                                                0.6
                                             } else {
-                                                -1.
+                                                -0.6
                                             },
                                     rotation: player_transform.rotation
                                         * Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2),
@@ -315,7 +325,7 @@ pub fn fire_missle(
                                 ..Default::default()
                             })
                             .insert(Missile {
-                                target: player.target,
+                                target: None,
                                 velocity: rb_vel.linvel.magnitude(),
                                 lifetime: 5.,
                             })

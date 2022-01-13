@@ -30,11 +30,7 @@ fn main() {
         .init_resource::<UiTargets>()
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        // .add_plugin(RapierRenderPlugin)
         .add_plugin(SkyBoxPlugin)
-        // .add_asset::<ParticleMaterial>()
-        // .insert_resource(SmokeTextures::default())
-        // .add_startup_system(setup_particles.system())
         .add_startup_system(setup.system())
         .add_startup_system(setup_terrain.system())
         .add_startup_system(setup_ui.system())
@@ -48,19 +44,12 @@ fn main() {
                 .after(bevy_rapier3d::physics::PhysicsSystems::SyncTransforms),
         )
         .add_system(text_update_system.system())
-        // .add_system_to_stage(CoreStage::PreUpdate, connection_system.system())
         .add_system(gamepad_system.system())
         .add_system(target_ui.system())
         .add_system(fire_missle.system().label(FIRE_MISSILE_LABEL))
         .add_system(missle_run.system().after(FIRE_MISSILE_LABEL))
         .add_system(radar.system())
         .add_system(drone_movement.system())
-        // .add_system(
-        //     run_emitter
-        //         .system()
-        //         .with_run_criteria(FixedTimestep::step(0.05)),
-        // )
-        // .add_system(run_particles.system())
         .run();
 }
 
